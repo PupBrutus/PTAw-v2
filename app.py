@@ -88,8 +88,10 @@ class SettingsWindow(QDialog):
         for timer, (min_input, max_input) in zip(self.timers, self.inputs):
             timer.min_time = float(min_input.text())
             timer.max_time = float(max_input.text())
+        self.hit_count_min = int(self.hit_count_min_input.text())
+        self.hit_count_max = int(self.hit_count_max_input.text())
+        self.parent().update_hit_count_range(self.hit_count_min, self.hit_count_max)
         self.close()
-
     # -=-=- Preset Handling -=-=-
         
     # Save Preset
@@ -267,6 +269,10 @@ class App(QMainWindow):
         with open('presets.json', 'w') as f:  # Write the updated presets to the file
             json.dump(self.presets, f)
         self.close()
+    
+    def update_hit_count_range(self, min_hits, max_hits):
+        self.hit_count_min = min_hits
+        self.hit_count_max = max_hits
 
     # -=-=- Timer Handling -=-=-
 
