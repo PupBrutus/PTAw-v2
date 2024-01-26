@@ -1,7 +1,7 @@
 import sys
 import json
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QDialog, QLineEdit, QFormLayout, QProgressBar, QHBoxLayout, QComboBox, QColorDialog, QMessageBox,QGraphicsDropShadowEffect
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QDialog, QLineEdit, QFormLayout, QProgressBar, QHBoxLayout, QComboBox, QColorDialog, QMessageBox, QFileDialog 
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtMultimedia import QSound
@@ -32,6 +32,13 @@ class SettingsWindow(QDialog):
         self.hit_count_min = hit_count_min
         self.hit_count_max = hit_count_max
         self.last_preset = None
+
+        # Initialize the sound paths with the current sound paths from the App instance
+        self.prepare_sound_path = self.parent().prepare_sound_path
+        self.hit_sound_path = self.parent().hit_sound_path
+        self.hold_sound_path = self.parent().hold_sound_path
+        self.release_sound_path = self.parent().release_sound_path
+
         self.initUI()
         self.update_settings_UI()
 
@@ -53,6 +60,20 @@ class SettingsWindow(QDialog):
         delete_button.clicked.connect(self.delete_preset)
         self.layout.addRow(delete_button)
 
+        # Create buttons for the sound files
+        self.prepare_sound_button = QPushButton('Select Prepare Sound', self)
+        self.hit_sound_button = QPushButton('Select Hit Sound', self)
+        self.hold_sound_button = QPushButton('Select Hold Sound', self)
+        self.release_sound_button = QPushButton('Select Release Sound', self)
+
+        # Connect the buttons to methods that open the file dialogs
+        self.prepare_sound_button.clicked.connect(self.select_prepare_sound)
+        self.hit_sound_button.clicked.connect(self.select_hit_sound)
+        self.hold_sound_button.clicked.connect(self.select_hold_sound)
+        self.release_sound_button.clicked.connect(self.select_release_sound)
+
+
+
         self.inputs = []
         self.color_buttons = []  # List to store the color buttons
         for timer in self.timers:
@@ -72,6 +93,12 @@ class SettingsWindow(QDialog):
         self.layout.addRow('Hit count min', self.hit_count_min_input)
         self.layout.addRow('Hit count max', self.hit_count_max_input)
 
+        # Add the buttons to the layout
+        self.layout.addRow('Prepare Sound', self.prepare_sound_button)
+        self.layout.addRow('Hit Sound', self.hit_sound_button)
+        self.layout.addRow('Hold Sound', self.hold_sound_button)
+        self.layout.addRow('Release Sound', self.release_sound_button)
+
         apply_button = QPushButton('Apply', self)
         apply_button.clicked.connect(self.apply)
         self.layout.addRow(apply_button)
@@ -83,6 +110,20 @@ class SettingsWindow(QDialog):
             timer.color = color.name()  # Update the color of the timer
         self.update_settings_UI()  # Update the UI to reflect the new color
 
+    # Select Prepare Sound
+        
+    def select_prepare_sound(self):
+        self.prepare_sound_path = QFileDialog.getOpenFileName(self, 'Select Prepare Sound', '', 'Sound Files (*.wav)')[0]
+
+    def select_hit_sound(self):
+        self.hit_sound_path = QFileDialog.getOpenFileName(self, 'Select Hit Sound', '', 'Sound Files (*.wav)')[0]
+
+    def select_hold_sound(self):
+        self.hold_sound_path = QFileDialog.getOpenFileName(self, 'Select Hold Sound', '', 'Sound Files (*.wav)')[0]
+
+    def select_release_sound(self):
+        self.release_sound_path = QFileDialog.getOpenFileName(self, 'Select Release Sound', '', 'Sound Files (*.wav)')[0]
+
     # Apply Settings to current session
     def apply(self):
         for timer, (min_input, max_input) in zip(self.timers, self.inputs):
@@ -90,6 +131,8 @@ class SettingsWindow(QDialog):
             timer.max_time = float(max_input.text())
         self.hit_count_min = int(self.hit_count_min_input.text())
         self.hit_count_max = int(self.hit_count_max_input.text())
+        self.parent().update_sound_paths(self.prepare_sound_path, self.hit_sound_path, self.hold_sound_path, self.release_sound_path)
+        
         self.parent().update_hit_count_range(self.hit_count_min, self.hit_count_max)
         self.close()
     # -=-=- Preset Handling -=-=-
@@ -163,10 +206,21 @@ class App(QMainWindow):
             # Load the first preset in the array if 'Default' doesn't exist
             first_preset_name = next(iter(self.presets))
             self.load_preset(first_preset_name)
-        self.sound_file_path = os.path.join(current_dir, 'prepare.wav')
+
+        if getattr(sys, 'frozen', False):
+            # The application is bundled
+            base_path = sys._MEIPASS
+        else:
+            # The application is run from a script
+            base_path = os.path.dirname(__file__)
+
         self.sound_effect = ""
         self.temp_hit_counter = 0
         self.hit_counter = 0
+        self.prepare_sound_path = os.path.join(base_path, 'prepare.wav')
+        self.hit_sound_path = os.path.join(base_path, 'hit.wav')
+        self.hold_sound_path = os.path.join(base_path, 'hold.wav')
+        self.release_sound_path = os.path.join(base_path, 'release.wav')
         self.initUI()
 
     def initUI(self):
@@ -273,6 +327,23 @@ class App(QMainWindow):
     def update_hit_count_range(self, min_hits, max_hits):
         self.hit_count_min = min_hits
         self.hit_count_max = max_hits
+
+    def update_sound_paths(self, prepare, hit, hold, release):
+        self.prepare_sound_path = prepare
+        self.hit_sound_path = hit
+        self.hold_sound_path = hold
+        self.release_sound_path = release
+
+        # Update the sound_effect attribute of each Timer object
+        for timer in self.timers:
+            if timer.name == 'Prepare':
+                timer.sound_effect = self.prepare_sound_path
+            elif timer.name == 'Hit':
+                timer.sound_effect = self.hit_sound_path
+            elif timer.name == 'Hold':
+                timer.sound_effect = self.hold_sound_path
+            elif timer.name == 'Release':
+                timer.sound_effect = self.release_sound_path
 
     # -=-=- Timer Handling -=-=-
 
